@@ -1,0 +1,17 @@
+__pycache__/
+.DS_Store
+*.sqlite*
+*.db
+*.log
+.remote/
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+.codex/
+.claude/
+node_modules/
+backups/
+test-workspace/
