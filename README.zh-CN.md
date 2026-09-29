@@ -60,10 +60,18 @@
 
 更多：[SECURITY.md](SECURITY.md)（英文）。
 
+## 让 AI Agent 帮你安装
+
+把仓库链接或解压后的文件夹交给 Agent，并附上下面这段话：
+
+> 先阅读本仓库的 AGENTS.md、README.md 和 SECURITY.md，然后逐步执行 AGENTS.md 中的“Import / run”。如果文件夹里已有 `board.sqlite3`，按更新处理，保留我的全部数据。在后台启动看板，确认 `/api/state` 返回的版本与 `VERSION` 文件一致，然后告诉我访问链接和停止命令。只启动看板：不要创建真实任务、不要开启自动认领、不要修改现有项目文件、不要读取或上传凭证。如果我要求执行任务，先检查 Codex CLI，并向我要一个测试目录。不要把服务暴露到网络，不要修改 Tailscale 或登录项。
+
+Agent 指南：[AGENTS.md](AGENTS.md)（英文）。不需要任何个人 Codex 配置、数据库、API 密钥或 Tailscale 文件。
+
 ## 开发
 
 ```sh
-for t in *_test.py; do python3 -B "$t" || exit 1; done
+fail=0; for t in *_test.py; do python3 -B "$t" >/dev/null 2>&1 || { echo "FAILED: $t"; fail=1; }; done; [ "$fail" = 0 ] && echo "ALL TESTS PASSED"
 ```
 
 测试使用临时数据库和模拟执行器，不调用真实模型。界面文案在 `i18n.js` 中按编号查找，`i18n_test.py` 会检查三种语言是否齐全。快捷键：`N` 新建任务，`/` 搜索，`Esc` 关闭。贡献规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。

@@ -60,10 +60,18 @@
 
 詳細：[SECURITY.md](SECURITY.md)（英語）。
 
+## AI エージェントにインストールを任せる
+
+リポジトリのリンクか展開したフォルダを、次の依頼文と一緒にエージェントへ渡してください。
+
+> このリポジトリの AGENTS.md、README.md、SECURITY.md を先に読み、AGENTS.md の「Import / run」を順番に実行してください。フォルダに `board.sqlite3` がすでにある場合は更新として扱い、私のデータをすべて残してください。ボードをバックグラウンドで起動し、`/api/state` のバージョンが `VERSION` ファイルと一致することを確認してから、アクセス用のリンクと停止コマンドを教えてください。ボードの起動だけを行い、実際のタスク作成、自動実行の有効化、既存プロジェクトのファイル変更、認証情報の読み取りやアップロードはしないでください。タスクの実行を頼んだ場合は、先に Codex CLI を確認し、テスト用フォルダを私に確認してください。サービスをネットワークに公開したり、Tailscale やログイン項目を変更したりしないでください。
+
+エージェント向けガイド：[AGENTS.md](AGENTS.md)（英語）。個人の Codex 設定、データベース、API キー、Tailscale のファイルは不要です。
+
 ## 開発
 
 ```sh
-for t in *_test.py; do python3 -B "$t" || exit 1; done
+fail=0; for t in *_test.py; do python3 -B "$t" >/dev/null 2>&1 || { echo "FAILED: $t"; fail=1; }; done; [ "$fail" = 0 ] && echo "ALL TESTS PASSED"
 ```
 
 テストは一時データベースと模擬実行環境を使い、実際のモデルは呼び出しません。画面の文言は `i18n.js` でキーごとに管理し、`i18n_test.py` が3言語すべてそろっているか確認します。ショートカット：`N` 新規タスク、`/` 検索、`Esc` 閉じる。詳しくは [CONTRIBUTING.md](CONTRIBUTING.md)（英語）。

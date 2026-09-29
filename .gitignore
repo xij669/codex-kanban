@@ -3,6 +3,7 @@ __pycache__/
 *.sqlite*
 *.db
 *.log
+*.pid
 .remote/
 .env
 .env.*

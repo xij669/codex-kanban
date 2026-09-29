@@ -16,6 +16,7 @@
 - Switching language no longer briefly shows "Connecting…".
 - `update.py` refuses to update while a task is running. New `compat_test.py` opens a database from the first preview and verifies that every project, task, comment and run survives, that demo data is not added again, and that the browser storage keys for language and selected project keep their names.
 - README in English, with Simplified Chinese and Japanese versions.
+- AGENTS.md walks an agent through import step by step: new install or update, tests with a clear pass line, background start with a pid file, version check against `VERSION`, stop, and update. All three READMEs include a ready-made request to give an agent. The test command no longer closes an interactive terminal when a test fails.
 
 ## 0.1.1
 

@@ -71,14 +71,14 @@ More: [SECURITY.md](SECURITY.md).
 
 Give an agent the repository link or the unzipped folder together with this request:
 
-> Read README.md, AGENTS.md and SECURITY.md first. In this folder, confirm Python 3.9+ and run `for t in *_test.py; do python3 -B "$t" || exit 1; done`. Start `python3 -B server.py` on a free local port, check `/api/state`, and give me the browser link. Only start the board: do not create real tasks, turn on Auto-run, change existing project files, or read or upload credentials. If I ask to run tasks, check that the Codex CLI is installed and signed in, and ask me for a test folder. Do not expose the service or change Tailscale or login items.
+> Read AGENTS.md, README.md and SECURITY.md in this repository, then follow "Import / run" in AGENTS.md step by step. If the folder already contains `board.sqlite3`, treat it as an update and keep all my data. Start the board in the background, confirm that `/api/state` reports the same version as the `VERSION` file, and give me the link and the command to stop it. Only start the board: do not create real tasks, turn on Auto-run, change existing project files, or read or upload credentials. If I ask to run tasks, check the Codex CLI first and ask me for a test folder. Do not expose the service to the network or change Tailscale or login items.
 
 Agent guide: [AGENTS.md](AGENTS.md). No personal Codex configuration, database, API key or Tailscale file is needed.
 
 ## Development
 
 ```sh
-for t in *_test.py; do python3 -B "$t" || exit 1; done
+fail=0; for t in *_test.py; do python3 -B "$t" >/dev/null 2>&1 || { echo "FAILED: $t"; fail=1; }; done; [ "$fail" = 0 ] && echo "ALL TESTS PASSED"
 ```
 
 Tests use temporary databases and a fake executor; no model is called. `server.py` serves the API and runs tasks, `board_state.py` builds the board summary, and `app.js` / `i18n.js` / `index.html` / `style.css` are the interface. Interface text is looked up by key in `i18n.js`; `i18n_test.py` fails if any language or key is missing. Shortcuts: `N` new task, `/` search, `Esc` close. See [CONTRIBUTING.md](CONTRIBUTING.md).

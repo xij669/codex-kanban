@@ -7,7 +7,7 @@ Codex Kanban uses Python 3.9+ and browser-native JavaScript. There is no build s
    - Interface text: add a key to `MESSAGES` in `i18n.js` with `zh`, `en` and `ja`, and use `t("key", {params})`. Never hard-code interface text in `app.js` or `index.html`, and never pass user content (project names, task text, comments, tags, paths, agent output) through `t()` or into a translated sentence.
    - New server errors go in `ERRORS` in `server.py` and are raised as `BoardError("code")`; add `err.<code>` to `i18n.js`. New failure reasons need `issue.<code>.title/short/action`.
    - Labels on cards, chips and tabs must fit on one line in all three languages.
-3. Run `for t in *_test.py; do python3 -B "$t" || exit 1; done`.
+3. Run `fail=0; for t in *_test.py; do python3 -B "$t" >/dev/null 2>&1 || { echo "FAILED: $t"; fail=1; }; done; [ "$fail" = 0 ] && echo "ALL TESTS PASSED"`.
 4. For UI changes, inspect both desktop (at least 1280 px) and phone (390 × 844 px), in Chinese, English and Japanese. `i18n_test.py` must pass.
 5. Open a pull request explaining the behavior, verification and any migration or deployment impact.
 
