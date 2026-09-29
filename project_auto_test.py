@@ -14,9 +14,15 @@ with tempfile.TemporaryDirectory() as folder:
     b=server.create_project({'name':'B','path':folder,'workflow':'development'})['id']
     ca=server.create_card({'projectId':a,'title':'A task','acceptance':'检查'})['id']
     cb=server.create_card({'projectId':b,'title':'B task','acceptance':'检查'})['id']
-    for cid in (ca,cb): server.move_card(cid,{'status':'todo'})
+    server.AUTO_WAKE.clear()
+    server.move_card(ca,{'status':'todo'})
+    assert server.AUTO_WAKE.is_set()  # An idle worker need not wait for its next timed poll.
+    server.AUTO_WAKE.clear()
+    server.move_card(cb,{'status':'todo'})
     assert server.auto_candidate() is None
+    server.AUTO_WAKE.clear()
     server.set_project_auto(b,{'autoEnabled':True})
+    assert server.AUTO_WAKE.is_set()
     assert server.auto_candidate()['id']==cb
     server.set_project_auto(a,{'autoEnabled':True})
     assert server.auto_candidate()['id']==ca

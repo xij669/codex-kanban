@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Codex Kanban · 任务看板</title>
+  <title>Codex Kanban</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -24,60 +24,63 @@
   <div class="shell">
     <aside class="sidebar">
       <div class="brand"><svg class="ui-icon" aria-hidden="true"><use href="#icon-kanban"></use></svg><span>Codex <span class="brand-muted">Kanban</span></span></div>
-      <button class="nav-item" data-action="new-project"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg>新建项目</button>
-      <div class="side-title">项目</div>
-      <nav id="project-list" class="project-list" aria-label="项目"></nav>
+      <button class="nav-item" data-action="new-project"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg><span data-i18n="app.newProject">新建项目</span></button>
+      <div class="side-title" data-i18n="app.projects">项目</div>
+      <nav id="project-list" class="project-list" data-i18n-attr="aria-label:app.projects"></nav>
       <div class="sidebar-bottom">
-        <div class="side-status"><span id="connection-dot" class="dot"></span><span id="connection-text">检查 Codex…</span></div>
-        <div class="side-status"><span class="dot"></span><span id="sync-status" role="status">正在连接…</span></div>
+        <label class="locale-control"><span data-i18n="app.language">语言</span><select class="locale-select" data-i18n-attr="aria-label:app.language"></select></label>
+        <div class="side-status"><span id="connection-dot" class="dot"></span><span id="connection-text" data-i18n="app.checkingCodex">检查 Codex…</span></div>
+        <div class="side-status"><span class="dot"></span><span id="sync-status" role="status" data-i18n="app.connecting">正在连接…</span></div>
+        <span class="app-version" data-app-version></span>
       </div>
     </aside>
 
     <main class="main">
       <div class="m-top">
-        <label class="m-project"><span class="visually-hidden">选择项目</span><select id="mobile-project"></select><svg class="ui-icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></label>
-        <button class="icon-button" data-action="toggle-search" aria-label="搜索"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg></button>
-        <button class="icon-button" data-action="project-settings" aria-label="项目设置"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
+        <label class="m-project"><span class="visually-hidden" data-i18n="app.selectProject">选择项目</span><select id="mobile-project"></select><svg class="ui-icon" aria-hidden="true"><use href="#icon-chevron-down"></use></svg></label>
+        <button class="icon-button" data-action="toggle-search" data-i18n-attr="aria-label:app.search"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg></button>
+        <button class="icon-button" data-action="project-settings" data-i18n-attr="aria-label:app.projectSettings"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
       </div>
 
       <header class="page-head">
-        <h1 id="page-title">任务看板</h1>
+        <h1 id="page-title"></h1>
         <div class="head-actions">
           <div id="agent-control" class="agent-control">
             <span id="agent-dot" class="agent-dot"></span>
-            <span class="agent-text"><strong>自动认领</strong><small id="agent-status"></small></span>
-            <label class="switch-wrap"><input id="auto-toggle" type="checkbox" aria-label="自动认领待办（当前项目）"><span class="switch"></span></label>
+            <span class="agent-text"><strong data-i18n="auto.label">自动认领</strong><small id="agent-status"></small></span>
+            <label class="switch-wrap"><input id="auto-toggle" type="checkbox" data-i18n-attr="aria-label:auto.aria"><span class="switch"></span></label>
           </div>
-          <button class="btn btn-secondary btn-lg desktop-only" data-action="project-settings"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg>项目设置</button>
-          <button class="btn btn-primary btn-lg desktop-only" data-action="new-card"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg>新建任务</button>
+          <button class="btn btn-secondary btn-lg desktop-only" data-action="project-settings"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg><span data-i18n="app.projectSettings">项目设置</span></button>
+          <button class="btn btn-primary btn-lg desktop-only" data-action="new-card"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg><span data-i18n="app.newTask">新建任务</span></button>
         </div>
       </header>
 
       <nav class="toolbar">
         <div class="tabs" role="tablist">
-          <button class="tab" role="tab" data-action="board">看板</button>
-          <button class="tab" role="tab" data-action="overview">概览</button>
+          <button class="tab" role="tab" data-action="board" data-i18n="app.board">看板</button>
+          <button class="tab" role="tab" data-action="overview" data-i18n="app.overview">概览</button>
         </div>
         <div id="attention" class="attention"></div>
         <div class="toolbar-right">
-          <label id="search-box" class="search-box"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg><input id="search" type="search" placeholder="搜索任务" aria-label="搜索任务" autocomplete="off"></label>
-          <button id="history-toggle" class="btn btn-secondary" data-action="history" aria-pressed="false">显示已完成 / 已取消</button>
+          <label id="search-box" class="search-box"><svg class="ui-icon" aria-hidden="true"><use href="#icon-search"></use></svg><input id="search" type="search" autocomplete="off" data-i18n-attr="placeholder:app.searchTasks;aria-label:app.searchTasks"></label>
+          <button id="history-toggle" class="btn btn-secondary" data-action="history" aria-pressed="false"></button>
         </div>
       </nav>
 
-      <div id="mobile-tabs" class="m-tabs" role="tablist" aria-label="看板列"></div>
-      <div class="m-hint"><span id="mobile-hint"></span><button id="mobile-history" class="text-button" data-action="history">显示已完成</button></div>
+      <div id="mobile-tabs" class="m-tabs" role="tablist" data-i18n-attr="aria-label:app.boardColumns"></div>
+      <div class="m-hint"><span id="mobile-hint"></span><button id="mobile-history" class="text-button" data-action="history"></button></div>
 
       <section id="notice" class="notice" hidden></section>
-      <section id="board" class="board" aria-label="任务看板"></section>
+      <section id="board" class="board" data-i18n-attr="aria-label:app.taskBoard"></section>
       <section id="overview" class="overview" hidden></section>
-      <section id="empty" class="empty-state" hidden><h2>还没有项目</h2><p>新建一个项目，开始记录任务。</p><button class="btn btn-primary btn-lg" data-action="new-project">新建项目</button></section>
+      <section id="empty" class="empty-state" hidden><h2 data-i18n="app.noProjects">还没有项目</h2><p data-i18n="app.noProjectsHint">新建一个项目，开始记录任务。</p><button class="btn btn-primary btn-lg" data-action="new-project" data-i18n="app.newProject">新建项目</button><label class="locale-control empty-locale"><span data-i18n="app.language">语言</span><select class="locale-select" data-i18n-attr="aria-label:app.language"></select></label></section>
     </main>
   </div>
 
-  <button class="fab" data-action="new-card"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg>新建任务</button>
+  <button class="fab" data-action="new-card"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg><span data-i18n="app.newTask">新建任务</span></button>
   <div id="modal-root"></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/i18n.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

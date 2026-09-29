@@ -31,6 +31,7 @@ with tempfile.TemporaryDirectory() as directory:
     server.move_card(card["id"], {"status": "todo"})
     server.add_comment(card["id"], {"body": "检查边界情况"})
     snapshot = server.state()
+    assert snapshot["version"] == Path(server.ROOT / "VERSION").read_text(encoding="utf-8").strip()
     assert next(c for c in snapshot["cards"] if c["id"] == card["id"])["status"] == "todo"
     assert any(c["body"] == "检查边界情况" for c in server.card_detail(card["id"])["comments"])
     server.move_card(card["id"], {"status": "review"})

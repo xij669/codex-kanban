@@ -106,9 +106,9 @@ with tempfile.TemporaryDirectory() as folder:
     with patch.dict(os.environ, {"PATH": str(fake_bin) + os.pathsep + os.environ["PATH"]}):
         server.execute_card(queued)
         deadline = time.time() + 5
-        while time.time() < deadline and server.card_detail(queued)["runs"][0]["activity"] != "运行命令：pytest -q":
+        while time.time() < deadline and server.card_detail(queued)["runs"][0]["activity"] != "command:pytest -q":
             time.sleep(0.1)
-        assert server.card_detail(queued)["runs"][0]["activity"] == "运行命令：pytest -q"
+        assert server.card_detail(queued)["runs"][0]["activity"] == "command:pytest -q"
         expect_error(lambda: server.stop_card(legacy), "没有在执行")
         started = time.time()
         server.stop_card(queued)

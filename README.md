@@ -1,57 +1,87 @@
 # Codex Kanban
 
-A local-first task board for human-reviewed Codex CLI work. 本地运行、人工批准执行、评论驱动返工的任务看板。个人项目，非 OpenAI 官方产品。
+**English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
-**当前为单人使用的原型，优先支持 macOS。** 看板使用 Python 标准库、SQLite 和原生 JavaScript，无 pip/npm 项目依赖。Windows 原生执行器尚未适配；Linux 未完成完整实机验证。手机通过浏览器操作，任务仍在宿主电脑执行。
+A local-first task board for human-reviewed Codex CLI work. You approve each task, the agent runs it on your own computer, and you review the result before it counts as done. Personal project; not an official OpenAI product.
 
-## 快速开始
+**Single-user preview, macOS first.** Python standard library, SQLite and plain JavaScript: no pip/npm dependencies and no build step. Windows is not supported as an executor yet; Linux is not fully tested. Your phone can operate the board through a browser, but tasks always run on the host computer.
 
-1. 从本仓库 **Code → Download ZIP** 下载并解压；或 `git clone https://github.com/xij669/codex-kanban.git`。
-2. 在解压/克隆后的目录打开终端，确认 Python 3.9+：
+The interface is available in English, 简体中文 and 日本語 (switch in the sidebar, or in Project settings on a phone). The choice is stored in your browser. Your own content — project names, tasks, comments and agent output — is never translated.
+
+## Quick start
+
+1. Download: **Code → Download ZIP** and unzip it, or `git clone https://github.com/xij669/codex-kanban.git`.
+2. In that folder, check Python 3.9+ and start the board:
    ```sh
    python3 --version
    python3 -B server.py
    ```
-3. 浏览器打开 [http://127.0.0.1:8765](http://127.0.0.1:8765)。首次启动生成演示数据；按 `Ctrl+C` 停止。
-4. 如端口被占用，运行 `BOARD_PORT=8766 python3 -B server.py`，访问对应端口。
+3. Open [http://127.0.0.1:8765](http://127.0.0.1:8765). The first start creates demo projects. Stop with `Ctrl+C`.
+4. If the port is taken: `BOARD_PORT=8766 python3 -B server.py`, then open that port.
 
-仅体验看板不需要 Codex。实际执行任务前，按 [Codex 官方说明](https://developers.openai.com/codex/cli/) 安装并登录 CLI；在同一终端确认 `codex --version`、`codex exec --help` 可用。当前调用需要支持 `--json`、`--approve-for-me`、`--cd`、`--skip-git-repo-check` 的 CLI。模型列表来自本机 Codex 缓存；没有缓存时使用 CLI 默认模型。
+You can try the board without Codex. To run tasks, install and sign in to the [Codex CLI](https://developers.openai.com/codex/cli/) and check that `codex --version` and `codex exec --help` work in the same terminal. The CLI must support `--json`, `--approve-for-me`, `--cd` and `--skip-git-repo-check`. Models are read from the local Codex cache; without it the CLI default is used.
 
-## 交给 AI Agent 导入
+## How it works
 
-将以下内容与**仓库链接或已解压的文件夹**一起交给 Agent：
+| Column | Who acts | What happens |
+| --- | --- | --- |
+| Backlog | You | Ideas and drafts. Never run automatically. Add acceptance criteria to move a task on. |
+| To do | Agent | Queued in the order shown: Urgent → High → Medium → Low, then oldest first. |
+| In progress | Agent | Elapsed time and the agent's current step are shown; you can stop it. |
+| In review | You | **Approve**, or write a change request and **Submit changes** to send it back to To do. Failed, stopped and timed-out runs also land here with the reason. |
+| Done / Cancelled | — | Hidden by default. |
 
-> 请先读 README.md、AGENTS.md 和 SECURITY.md。在当前克隆目录确认 Python 3.9+，执行 `for t in *_test.py; do python3 -B "$t" || exit 1; done`。选择空闲本地端口启动 `python3 -B server.py`，访问 `/api/state` 确认服务正常，把浏览器链接给我。先只启动看板；不要创建真实执行任务、开启自动认领、修改已有项目文件、读取或上传登录凭证。若我要求执行任务，再检查 Codex CLI 是否安装登录，并让我指定一个测试项目目录。不要公开服务或更改 Tailscale、开机启动配置。
+One task runs at a time; urgent tasks do not interrupt a running one. A run stops after 60 minutes by default (`BOARD_RUN_TIMEOUT_MINUTES`, `0` for no limit). **Auto-run** is off by default and set per project.
 
-Agent 入口：[AGENTS.md](AGENTS.md)。不需要导入个人 Codex 配置，不需要复制任何数据库、API Key 或 Tailscale 文件。
+### Your first run
 
-## 第一次执行
+1. Create an empty test folder, create a development project and link that folder.
+2. Create a task with a goal and acceptance criteria. It starts in Backlog.
+3. Move it to To do and click **Run now**. Turn on Auto-run only after you trust the flow.
+4. When it reaches In review, check the real files, then Approve or submit a change request.
 
-1. 创建一个空测试目录，在看板新建开发项目并关联它。
-2. 新建任务，写明目标和验收标准。任务先进入**任务仓**，不会自动执行。
-3. 将任务放入**待办**，手动“立即运行”；确认流程后才开启该项目的自动认领。
-4. 执行结束进入**审阅中**；检查实际文件和结果，点击“验收通过”，或填写意见“提交并返工”。
+## Updating without losing your data
 
-优先级：紧急 > 高 > 中 > 低，同级按创建顺序。全局只执行一张任务；紧急任务不抢占正在执行的任务。失败、停止、超时都回到审阅中并提示原因。默认单轮超时 60 分钟，可用 `BOARD_RUN_TIMEOUT_MINUTES` 调整（0 为不限）。
+Your projects, tasks, comments, run history and per-project settings live in `board.sqlite3` inside the folder you run the board from. Your language and selected project live in the browser. **Updates never replace any of these.**
 
-## 数据与安全
+Before updating: let running tasks finish (or stop them), then stop the board server. Keep using the same address and port afterwards so the browser keeps your language and selected project.
 
-- 数据保存在启动代码目录的 `board.sqlite3`。升级前停止服务并备份数据库；迁移时不要用下载文件覆盖数据库。
-- 仅监听 `127.0.0.1`，**没有内置登录系统**。不要部署到公网、GitHub Pages、公共反向代理，也不要打开 Tailscale Funnel。
-- 看板能启动会读写项目目录的 Agent。请先使用测试目录或版本控制；沙箱限制不等于备份，也不保证读取内容只限项目目录。
-- Codex 会将任务上下文及读取的相关内容交给所配置的模型服务处理；不要提供不允许发送给该服务的资料。凭证由 CLI 自行管理。
-- 手机访问见 [REMOTE.md](REMOTE.md)。只有受信任设备应获得访问权限。
-- 重启不会恢复执行中的子进程；请先停止任务并等待结束，再退出服务。没有额度恢复自动复工、多人权限、自动备份或 Claude 执行器。
+- **Installed with Git:** in the existing folder run `git pull --ff-only`. `board.sqlite3`, `backups/` and `.remote/` are ignored by Git and are never overwritten. If you edited program files yourself, resolve conflicts normally; never force-reset over your data.
+- **Installed from a ZIP:** unzip the new version into a **different** folder, then from the new folder run:
 
-## 开发与验证
+  ```sh
+  python3 -B update.py "/full/path/to/your/existing/codex-kanban"
+  ```
+
+  It replaces only `VERSION` and the six program files, makes a private SQLite backup in `backups/` of the existing folder first, and refuses to run while a task is still running. Your database, projects, `.remote/` and other files are not touched. Start the board again **from the existing folder**. Never copy a new ZIP over the old folder.
+
+Database migrations run automatically on start, only add structure, and are tested against databases from the first preview (`compat_test.py`). To roll back, stop the server and restore a copy from `backups/`; changes made after that backup are lost.
+
+## Data and security
+
+- Listens on `127.0.0.1` only and has **no login**. Do not expose it to the internet, GitHub Pages or a public proxy, and do not enable Tailscale Funnel. Phone access: see [REMOTE.md](REMOTE.md).
+- The board launches an agent that reads and writes project folders. Start with a test folder or version control. Sandboxing is not a backup.
+- Codex sends task context and files it reads to the configured model provider. Do not include data you may not share with it. Credentials stay with the CLI.
+- A restart cannot reattach to a running task: stop tasks before quitting the server.
+- Not included yet: automatic resume after usage limits, multi-user access, automatic backups, a Claude executor.
+
+More: [SECURITY.md](SECURITY.md).
+
+## Using an AI agent to install it
+
+Give an agent the repository link or the unzipped folder together with this request:
+
+> Read README.md, AGENTS.md and SECURITY.md first. In this folder, confirm Python 3.9+ and run `for t in *_test.py; do python3 -B "$t" || exit 1; done`. Start `python3 -B server.py` on a free local port, check `/api/state`, and give me the browser link. Only start the board: do not create real tasks, turn on Auto-run, change existing project files, or read or upload credentials. If I ask to run tasks, check that the Codex CLI is installed and signed in, and ask me for a test folder. Do not expose the service or change Tailscale or login items.
+
+Agent guide: [AGENTS.md](AGENTS.md). No personal Codex configuration, database, API key or Tailscale file is needed.
+
+## Development
 
 ```sh
 for t in *_test.py; do python3 -B "$t" || exit 1; done
 ```
 
-测试使用临时数据库和模拟执行器，不调用真实模型。前端修改还需检查桌面和 390×844 手机布局。
-
-文件：`server.py` 为服务和调度，`app.js` / `index.html` / `style.css` 为 UI，`*_test.py` 为测试。按 `N` 新建、`/` 搜索、`Esc` 关闭。开发与内容任务使用不同工作流；内容项目不自动执行。
+Tests use temporary databases and a fake executor; no model is called. `server.py` serves the API and runs tasks, `board_state.py` builds the board summary, and `app.js` / `i18n.js` / `index.html` / `style.css` are the interface. Interface text is looked up by key in `i18n.js`; `i18n_test.py` fails if any language or key is missing. Shortcuts: `N` new task, `/` search, `Esc` close. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
