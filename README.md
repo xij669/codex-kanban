@@ -12,7 +12,7 @@ A local-first task board for human-reviewed Codex CLI work. 本地运行、人�
    python3 --version
    python3 -B server.py
    ```
-3. 浏览器打开 **http://127.0.0.1:8765**。首次启动生成演示数据；按 `Ctrl+C` 停止。
+3. 浏览器打开 [http://127.0.0.1:8765](http://127.0.0.1:8765)。首次启动生成演示数据；按 `Ctrl+C` 停止。
 4. 如端口被占用，运行 `BOARD_PORT=8766 python3 -B server.py`，访问对应端口。
 
 仅体验看板不需要 Codex。实际执行任务前，按 [Codex 官方说明](https://developers.openai.com/codex/cli/) 安装并登录 CLI；在同一终端确认 `codex --version`、`codex exec --help` 可用。当前调用需要支持 `--json`、`--approve-for-me`、`--cd`、`--skip-git-repo-check` 的 CLI。模型列表来自本机 Codex 缓存；没有缓存时使用 CLI 默认模型。
