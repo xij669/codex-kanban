@@ -88,3 +88,5 @@ Tests use temporary databases and a fake executor; no model is called. `server.p
 [MIT](LICENSE) © 2026 xij669.
 
 Task numbers are local to each project, starting at `TASK-001`. Upgrades preserve database IDs and history; deleted numbers are not reused and padding grows beyond three digits. Search matches the current project’s number, title, description and tags, case-insensitively; `#` searches tags only. Comments and run output are excluded. Search includes done/cancelled tasks automatically; clearing it restores the previous visibility setting.
+
+The footer shows account-wide Codex limits (available five-hour/weekly windows), remaining percentages and reset times in your device time zone. It refreshes every minute using the local Codex CLI ChatGPT login; it does not run a model. Missing/unsupported access is shown as unavailable. Limits are shared across projects, not a per-project budget.

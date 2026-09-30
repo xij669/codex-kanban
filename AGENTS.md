@@ -75,7 +75,7 @@ Check `codex --version` and that `codex exec --help` lists `--json`, `--approve-
 
 ## Contributing
 
-- `server.py`: HTTP, SQLite migrations, executor. `board_state.py`: compact board queries. `app.js`, `i18n.js`, `style.css`, `index.html`: UI and localization. `*_test.py`: no real model calls.
+- `server.py`: HTTP, SQLite migrations, executor. `board_state.py`: compact board queries. `codex_usage.py`: read-only quota RPC and cache (`GET /api/usage`); needs local Codex ChatGPT login, never starts a model turn. `app.js`, `i18n.js`, `style.css`, `index.html`: UI and localization. `*_test.py`: no real model calls.
 - Interface text lives in `i18n.js` (`t("key")`, keys with zh/en/ja). Server errors use codes (`BoardError`, `ERRORS`) and failure reasons use `issue.code`; the browser translates by code. Never put user content (task titles, comments, project names, tags, paths, run output) into translated text. `i18n_test.py` must pass.
 - SQLite migrations must be idempotent, additive and keep existing data (`compat_test.py`). Never rename the browser storage keys `codexKanbanLocale` / `boardProject`. Add focused tests for behavior changes.
 - Update `VERSION` and the changelog together for each visible release. The version is shown in the sidebar and Project settings.

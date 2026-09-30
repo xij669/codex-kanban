@@ -791,8 +791,40 @@ document.addEventListener("drop", async event => {
   catch (error) { toast(error.message); render(); }
 });
 
+
+// Account-wide read-only quota, independent from project snapshots and their revisions.
+let usageData = null, usageBusy = false;
+function renderUsage() {
+  const root = $("#codex-usage");
+  const windows = usageData?.status === "available" ? usageData.windows : [];
+  const now = Date.now() / 1000;
+  root.title = t("usage.hint");
+  root.innerHTML = `<div class="usage-heading"><strong>${t("usage.title")}</strong><span>${t("usage.shared")}</span></div>`
+    + (windows.length ? windows.map(w => {
+      const name = w.minutes === 10080 ? t("usage.week") : w.minutes === 300 ? t("usage.fiveHours") : t("usage.minutes", {n:w.minutes});
+      const pending = w.resetsAt != null && w.resetsAt <= now;
+      const value = pending ? t("usage.pending") : t("usage.remaining", {n:w.remainingPercent});
+      const reset = w.resetsAt == null ? t("usage.unknownReset") : t("usage.reset", {time: new Intl.DateTimeFormat(currentLocale, {
+        month:"short", day:"numeric", hour:"2-digit", minute:"2-digit", timeZoneName:"short"
+      }).format(new Date(w.resetsAt * 1000))});
+      return `<div class="usage-window"><span class="usage-value ${!pending && w.remainingPercent <= 10 ? "usage-low" : ""}">${h(name)} · ${h(value)}</span><span class="usage-reset">${h(reset)}</span></div>`;
+    }).join("") : `<span class="usage-message">${t(usageData ? "usage.unavailable" : "usage.loading")}</span>`);
+}
+async function refreshUsage() {
+  if (usageBusy || document.hidden) return;
+  usageBusy = true;
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch("/api/usage", {signal:controller.signal, cache:"no-store"});
+    if (!response.ok) throw new Error("usage unavailable");
+    usageData = await response.json();
+  } catch (_) { usageData = {status:"unavailable", windows:[]}; }
+  finally { clearTimeout(timer); usageBusy = false; renderUsage(); }
+}
+
 /* Called by setLocale() in i18n.js: rebuild everything that holds interface text. */
 function onLocaleChange() {
+  renderUsage();
   document.querySelectorAll(".locale-select").forEach(select => { select.innerHTML = localeOptions(); select.value = currentLocale; });
   setSync(syncKey);
   if (!S) return;
@@ -815,5 +847,9 @@ document.addEventListener("change", event => {
 applyStaticText();
 document.querySelectorAll(".locale-select").forEach(select => { select.innerHTML = localeOptions(); });
 refresh(true);
+renderUsage();
+refreshUsage();
+setInterval(refreshUsage, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshUsage(); });
 setInterval(() => { if (!document.hidden) refresh(); }, POLL_MS);
 setInterval(tick, 1000);

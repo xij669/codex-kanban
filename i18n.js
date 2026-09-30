@@ -15,6 +15,18 @@ const LOCALES = [
 ];
 
 const MESSAGES = {
+  "usage.title": {zh: "Codex 额度", en: "Codex limits", ja: "Codex 利用枠"},
+  "usage.shared": {zh: "账号共享", en: "Account-wide", ja: "アカウント共通"},
+  "usage.loading": {zh: "读取中…", en: "Loading…", ja: "読み込み中…"},
+  "usage.unavailable": {zh: "额度暂不可用", en: "Limits unavailable", ja: "利用枠を取得できません"},
+  "usage.hint": {zh: "需要本机 Codex 登录 ChatGPT；每分钟自动检查。", en: "Requires local Codex signed in with ChatGPT. Checked every minute.", ja: "ローカルの Codex で ChatGPT へのログインが必要です。毎分確認します。"},
+  "usage.week": {zh: "每周", en: "Weekly", ja: "週間"},
+  "usage.fiveHours": {zh: "5 小时", en: "5 hours", ja: "5 時間"},
+  "usage.minutes": {zh: "{n} 分钟", en: "{n} min", ja: "{n} 分"},
+  "usage.remaining": {zh: "剩余 {n}%", en: "{n}% left", ja: "残り {n}%"},
+  "usage.reset": {zh: "{time} 重置", en: "Resets {time}", ja: "{time} リセット"},
+  "usage.unknownReset": {zh: "重置时间未提供", en: "Reset time unavailable", ja: "リセット日時は未取得"},
+  "usage.pending": {zh: "等待额度更新", en: "Awaiting refresh", ja: "更新待ち"},
   // App shell
   "app.language": {zh: "语言", en: "Language", ja: "言語"},
   "app.newProject": {zh: "新建项目", en: "New project", ja: "新規プロジェクト"},

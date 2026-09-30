@@ -16,7 +16,7 @@ from pathlib import Path
 from uuid import uuid4
 
 
-APP_FILES = ("VERSION", "server.py", "board_state.py", "app.js", "i18n.js", "index.html", "style.css")
+APP_FILES = ("VERSION", "server.py", "board_state.py", "codex_usage.py", "app.js", "i18n.js", "index.html", "style.css")
 
 
 def update_to(target, source=None):

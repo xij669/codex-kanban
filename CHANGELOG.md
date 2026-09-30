@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2
+
+- Add an account-wide Codex usage footer on desktop and mobile: remaining percentages for the available five-hour and weekly windows, with reset times in the viewer's local time zone. Low remaining quota (10% or less) uses a subtle amber label.
+- Read the official Codex app-server `account/rateLimits/read` endpoint using the local CLI login. No model turn is started; no credential or raw account response is sent to the browser. API-key-only login, unsupported CLI versions and connection failures show unavailable, never zero.
+- Share a one-minute in-memory cache across projects and browser tabs. Missing windows are omitted; expired windows await refreshed data instead of assuming a reset.
+- Add quota adapter and UI checks; include the new module in ZIP updates and deployment. Existing projects, tasks, history and preferences are preserved.
+
 ## 0.2.1
 
 - Display independent project-local task numbers (`TASK-001`); preserve existing global database IDs, comments and run history during migration.

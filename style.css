@@ -394,3 +394,17 @@ body.no-project .m-top, body.no-project .m-tabs, body.no-project .m-hint, body.n
   .m-tabs.many .m-tab { padding: 0 6px; }
   .m-tab .tab-count, .m-tab .count-badge { flex: none; }
 }
+
+/* Quiet account-wide quota footer; separate from project controls. */
+.codex-usage { margin-top: auto; border-top: 1px solid var(--line); padding: 12px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.usage-heading, .usage-window { display: flex; flex-direction: column; min-width: 0; }
+.usage-heading strong { font-weight: 600; color: var(--ink-2); }
+.usage-heading > span, .usage-reset { font-size: 11px; }
+.usage-value { font-variant-numeric: tabular-nums; }
+.usage-low { color: var(--backlog-text); font-weight: 600; }
+@media (max-width: 620px) {
+  .codex-usage { padding: 14px 16px calc(100px + env(safe-area-inset-bottom)); gap: 12px 20px; }
+  .usage-heading { flex-basis: 100%; flex-direction: row; align-items: baseline; gap: 8px; }
+  .usage-window { flex: 1 1 140px; }
+  .board { padding-bottom: 24px; }
+}

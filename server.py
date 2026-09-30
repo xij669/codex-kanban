@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from board_state import summarize_cards
+from codex_usage import UsageCache
 
 
 ROOT = Path(__file__).resolve().parent
@@ -38,6 +39,7 @@ ALLOWED_ORIGINS = LOCAL_ORIGINS | ({REMOTE_ORIGIN} if REMOTE_ORIGIN else set())
 ALLOWED_HOSTS = {"127.0.0.1:%s" % PORT, "localhost:%s" % PORT}
 if REMOTE_ORIGIN:
     ALLOWED_HOSTS.add(urlparse(REMOTE_ORIGIN).netloc)
+USAGE_CACHE = UsageCache()
 RUN_LOCK = threading.Lock()
 AUTO_WAKE = threading.Event()
 PRIORITIES = ("urgent", "high", "normal", "low")
@@ -1044,6 +1046,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             request_url = urlparse(self.path)
             path = request_url.path
+            if path == "/api/usage":
+                return self.send_json(USAGE_CACHE.get())
             if path == "/api/state":
                 snapshot = state()
                 since = parse_qs(request_url.query).get("rev", [""])[0]
