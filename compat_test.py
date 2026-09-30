@@ -60,6 +60,7 @@ with tempfile.TemporaryDirectory() as folder:
         assert con.execute("SELECT count(*) FROM projects").fetchone()[0] == 2, "demo data must not be added"
         assert con.execute("SELECT auto_enabled FROM projects WHERE id=7").fetchone()[0] == 1
     state = server.state()
+    assert {c["id"]: c["task_number"] for c in state["cards"]} == {21: 1, 22: 2, 23: 1}
     card = next(c for c in state["cards"] if c["id"] == 21)
     assert card["issue"]["code"] == "permission" and card["commentCount"] == 1
 

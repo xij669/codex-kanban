@@ -86,3 +86,5 @@ Tests use temporary databases and a fake executor; no model is called. `server.p
 ## License
 
 [MIT](LICENSE) © 2026 xij669.
+
+Task numbers are local to each project, starting at `TASK-001`. Upgrades preserve database IDs and history; deleted numbers are not reused and padding grows beyond three digits. Search matches the current project’s number, title, description and tags, case-insensitively; `#` searches tags only. Comments and run output are excluded. Search includes done/cancelled tasks automatically; clearing it restores the previous visibility setting.

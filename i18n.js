@@ -352,6 +352,7 @@ const MESSAGES = {
   "err.untrusted_host": {zh: "访问地址不受信任", en: "Untrusted address", ja: "信頼できないアドレスです"},
   "err.untrusted_origin": {zh: "请求来源不受信任", en: "Untrusted origin", ja: "信頼できない送信元です"},
   "err.not_found": {zh: "接口不存在", en: "Not found", ja: "見つかりません"},
+  "err.number_exhausted": {zh: "任务编号已达到安全上限，无法创建新任务", en: "The safe task number limit has been reached; no new task was created.", ja: "タスク番号が安全な上限に達したため、新しいタスクを作成できません。"},
   "err.internal": {zh: "服务器内部错误", en: "Internal server error", ja: "サーバー内部エラー"},
 };
 

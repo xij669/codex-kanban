@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Display independent project-local task numbers (`TASK-001`); preserve existing global database IDs, comments and run history during migration.
+- Persist numbering high-water marks and allocate in a transaction; deleted numbers are never reused, including internal IDs created after this upgrade. APIs expose a hidden global reference padded to at least 12 digits (`DEV-000000000001`).
+- Three digits are minimum padding, not a ceiling. Numbers grow beyond 999; creation rejects values beyond JavaScript's safe integer limit instead of wrapping.
+- Include task numbers in Agent context and project-scoped search. Search matches number, title, description and tags (case-insensitive); `#` searches tags only. Comments/run output are excluded. Searching reveals done/cancelled tasks; clearing search restores the previous visibility setting.
+
 ## 0.2.0
 
 - **Interface text is looked up by key** (`i18n.js`, `t("key")`). The old page-scanning translation was removed: it could translate parts of user content (for example a project name inside the delete confirmation) and mix languages in one sentence.

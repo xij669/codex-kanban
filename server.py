@@ -53,6 +53,7 @@ WORKFLOWS = {
 # the Chinese text stays for logs, tests and API clients that read `error`.
 ERRORS = {
     "model_invalid": "请选择本机模型列表中的模型及其支持的 Thinking 档位",
+    "number_exhausted": "任务编号已达到安全上限，无法创建新任务",
     "task_not_found": "任务不存在",
     "config_locked_running": "当前任务正在执行，请在本轮结束后修改配置",
     "approve_not_review": "只有审阅中的任务可以验收通过",
@@ -358,6 +359,22 @@ def init_db():
                                   ("已发布的内容案例", "done")]:
                 con.execute("""INSERT INTO cards(project_id,title,status,created_at,updated_at)
                                VALUES (?,?,?,?,?)""", (content_id, title, status, stamp, stamp))
+        # Persistent high-water marks keep numbers stable after deletion/restart.
+        if "task_number" not in columns(con, "cards"):
+            con.execute("ALTER TABLE cards ADD COLUMN task_number INTEGER")
+        if "task_sequence" not in columns(con, "projects"):
+            con.execute("ALTER TABLE projects ADD COLUMN task_sequence INTEGER NOT NULL DEFAULT 0")
+        for project in con.execute("SELECT id,task_sequence FROM projects").fetchall():
+            sequence = max(project["task_sequence"], con.execute(
+                "SELECT COALESCE(MAX(task_number),0) FROM cards WHERE project_id=?", (project["id"],)).fetchone()[0])
+            for task in con.execute("SELECT id FROM cards WHERE project_id=? AND task_number IS NULL ORDER BY id", (project["id"],)).fetchall():
+                sequence += 1
+                con.execute("UPDATE cards SET task_number=? WHERE id=?", (sequence, task["id"]))
+            con.execute("UPDATE projects SET task_sequence=? WHERE id=?", (sequence, project["id"]))
+        con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_cards_project_number ON cards(project_id,task_number)")
+        maximum = con.execute("SELECT COALESCE(MAX(id),0) FROM cards").fetchone()[0]
+        con.execute("INSERT OR IGNORE INTO settings VALUES ('card_sequence', ?)", (str(maximum),))
+        con.execute("UPDATE settings SET value=CAST(MAX(CAST(value AS INTEGER),?) AS TEXT) WHERE key='card_sequence'", (maximum,))
         # Demo data is generated once; deleting every project later must not bring it back.
         con.execute("INSERT OR IGNORE INTO settings VALUES ('seeded', 'true')")
 
@@ -397,7 +414,7 @@ def run_summary(run):
 def state():
     """Board snapshot. Comments and full run output are loaded per card via card_detail()."""
     with db() as con:
-        cards = rows(con, "SELECT * FROM cards ORDER BY id")
+        cards = rows(con, "SELECT *, printf('DEV-%012d',id) AS global_number FROM cards ORDER BY id")
         summarize_cards(con, cards, card_issue, run_summary)
         snapshot = {
             "projects": rows(con, "SELECT * FROM projects ORDER BY id"),
@@ -416,7 +433,7 @@ def state():
 
 def card_detail(card_id):
     with db() as con:
-        card = con.execute("SELECT * FROM cards WHERE id=?", (card_id,)).fetchone()
+        card = con.execute("SELECT *, printf('DEV-%012d',id) AS global_number FROM cards WHERE id=?", (card_id,)).fetchone()
         if not card:
             raise BoardError("task_not_found")
         return {"card": dict(card),
@@ -515,7 +532,8 @@ def create_card(data):
     if priority not in PRIORITIES:
         raise BoardError("priority_invalid")
     with db() as con:
-        project = con.execute("SELECT id,workflow FROM projects WHERE id=?", (project_id,)).fetchone()
+        con.execute("BEGIN IMMEDIATE")
+        project = con.execute("SELECT id,workflow,task_sequence FROM projects WHERE id=?", (project_id,)).fetchone()
         if not project:
             raise BoardError("project_not_found")
         model = effort = ""
@@ -524,13 +542,20 @@ def create_card(data):
             model, effort = str(data.get("model", model)), str(data.get("thinking", effort))
             validate_execution(model, effort)
         stamp = now()
-        cur = con.execute("""INSERT INTO cards(project_id,title,description,acceptance,status,priority,tags,source,model,thinking,created_at,updated_at)
-                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                          (project_id, title, str(data.get("description", "")).strip(),
+        task_number = project["task_sequence"] + 1
+        card_id = int(con.execute("SELECT value FROM settings WHERE key='card_sequence'").fetchone()[0]) + 1
+        # JSON IDs must stay exact in JavaScript; reject instead of wrapping/rounding.
+        if max(task_number, card_id) > 9007199254740991:
+            raise BoardError("number_exhausted")
+        con.execute("UPDATE projects SET task_sequence=? WHERE id=?", (task_number, project_id))
+        con.execute("UPDATE settings SET value=? WHERE key='card_sequence'", (str(card_id),))
+        cur = con.execute("""INSERT INTO cards(id,task_number,project_id,title,description,acceptance,status,priority,tags,source,model,thinking,created_at,updated_at)
+                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                          (card_id, task_number, project_id, title, str(data.get("description", "")).strip(),
                            str(data.get("acceptance", "")).strip(), "backlog", priority,
                            str(data.get("tags", "")).strip(), str(data.get("source", "")).strip(),
                            model, effort, stamp, stamp))
-        return {"id": cur.lastrowid}
+        return {"id": cur.lastrowid, "task_number": task_number}
 
 
 def update_card(card_id, data):
@@ -849,7 +874,7 @@ def write_project_context(con, card, destination):
             run_index.append({k: run[k] for k in ("id", "status", "started_at", "ended_at", "model", "thinking")})
         save(folder / "runs.json", run_index)
         latest = next((r for r in runs if r["status"] != "running"), None)
-        index.append({"id": task["id"], "title": task["title"], "status": task["status"],
+        index.append({"id": task["id"], "taskNumber": "TASK-%03d" % task["task_number"], "title": task["title"], "status": task["status"],
                       "updated_at": task["updated_at"],
                       "latestRunStatus": latest["status"] if latest else None,
                       "resultExcerpt": (latest["output"] or latest["error"])[:240] if latest else "",
@@ -899,6 +924,7 @@ def run_codex(card, run_id):
             "不要自行发布、推送或部署。完成后报告改动、验证结果和需要人工审阅的事项。",
             "若必须等待用户提供信息才能继续，请在最终答复中另起一行写 TASKBOARD_NEEDS_INPUT: 所需信息。不要把受阻任务报告为完成。",
             "项目：" + card["project_name"],
+            "任务编号：TASK-%03d" % card["task_number"],
             "卡片：" + card["title"],
             "说明：" + card["description"],
             "验收标准：" + card["acceptance"],

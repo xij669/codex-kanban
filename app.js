@@ -6,7 +6,6 @@
 /* All interface text comes from i18n.js: t("key", {params}). User content (names, titles, comments,
    tags, paths, agent output) is inserted verbatim and never passed through t(). */
 const label = status => t(`status.${status}`);
-const PREFIX = {development:"DEV",content:"CNT"};
 const PRIORITY = {urgent:{rank:0},high:{rank:1},normal:{rank:2},low:{rank:3}};
 const priorityLabel = id => t(`priority.${id}`);
 const POLL_MS = 3000;
@@ -34,7 +33,7 @@ const isMobile = () => window.matchMedia("(max-width: 620px)").matches;
 const project = () => S?.projects.find(p => p.id === projectId) || S?.projects[0] || null;
 const cardById = id => S?.cards.find(c => c.id === Number(id));
 const projectOf = card => S?.projects.find(p => p.id === card.project_id);
-const cardName = card => `${PREFIX[projectOf(card)?.workflow] || "TASK"}-${String(card.id).padStart(3, "0")}`;
+const cardName = card => `TASK-${String(card.task_number).padStart(3, "0")}`;
 const isDev = p => p?.workflow === "development";
 const hasDrafts = () => Object.keys(formDrafts).length > 0;
 const statusDot = status => `<span class="status-dot s-${status}"></span>`;
@@ -217,7 +216,7 @@ function renderAttention(p) {
 
 function visibleStatuses(p) {
   let statuses = isDev(p) ? ["backlog", "todo", "progress", "review"] : ["backlog", "review"];
-  if (showHistory) statuses = [...statuses, "done", "cancelled"];
+  if (showHistory || searchText) statuses = [...statuses, "done", "cancelled"];
   return statuses;
 }
 
@@ -229,16 +228,19 @@ function matches(card) {
 
 function renderBoard(p) {
   const all = visibleStatuses(p);
+  $("#history-toggle").hidden = !!searchText;
+  $("#mobile-history").hidden = !!searchText;
   const cardsIn = status => sortCards(status, projectCards(p).filter(c => c.status === status && matches(c)));
   let statuses = all;
   if (isMobile()) {
+    if (searchText && !cardsIn(mobileStatus).length) mobileStatus = all.find(s => cardsIn(s).length) || all[0];
     if (!mobileStatus || !all.includes(mobileStatus)) {
       mobileStatus = countBy(p, "review") ? "review" : all.find(s => countBy(p, s)) || all[0];
     }
     $("#mobile-tabs").style.setProperty("--tabs", all.length);
     $("#mobile-tabs").classList.toggle("many", all.length > 4);   // 6 tabs scroll sideways instead of truncating
     $("#mobile-tabs").innerHTML = all.map(status => {
-      const n = countBy(p, status), selected = status === mobileStatus;
+      const n = searchText ? cardsIn(status).length : countBy(p, status), selected = status === mobileStatus;
       const count = status === "review" && n ? `<span class="count-badge">${n}</span>` : `<span class="tab-count">${n}</span>`;
       return `<button role="tab" aria-selected="${selected}" class="m-tab ${selected ? "active" : ""}" data-action="mobile-status" data-status="${status}">${statusDot(status)}<span class="m-tab-label">${t(`short.${status}`)}</span>${count}</button>`;
     }).join("");
@@ -250,7 +252,7 @@ function renderBoard(p) {
   const focused = document.activeElement?.closest?.("[data-card]")?.dataset.card;
   $("#board").style.setProperty("--columns", statuses.length);
   $("#board").innerHTML = statuses.map(status => {
-    const cards = cardsIn(status), n = countBy(p, status);
+    const cards = cardsIn(status), n = searchText ? cards.length : countBy(p, status);
     const count = status === "review" && n ? `<span class="count-badge">${n}</span>` : `<span class="column-count">${n}</span>`;
     const hint = status === "todo" && isDev(p) ? `<span class="column-hint">${t("column.queued")}</span>` : "";
     return `<div class="column" data-status="${status}"><div class="column-header">${statusDot(status)}<span class="column-title">${label(status)}</span>${count}${hint}</div>`
