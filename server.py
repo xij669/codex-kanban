@@ -40,7 +40,8 @@ ALLOWED_HOSTS = {"127.0.0.1:%s" % PORT, "localhost:%s" % PORT}
 if REMOTE_ORIGIN:
     ALLOWED_HOSTS.add(urlparse(REMOTE_ORIGIN).netloc)
 USAGE_CACHE = UsageCache()
-RUN_LOCK = threading.Lock()
+RUNS_GUARD = threading.Lock()
+ACTIVE_RUNS = {}
 AUTO_WAKE = threading.Event()
 PRIORITIES = ("urgent", "high", "normal", "low")
 
@@ -90,9 +91,9 @@ ERRORS = {
     "blocked_path": "请先为项目设置有效的本地目录",
     "blocked_codex": "未找到 Codex CLI",
     "blocked_model": "模型配置无效：请选择本机模型列表中的模型及其支持的 Thinking 档位",
-    "single_run": "原型当前只支持同时执行一张卡片",
+    "project_busy": "当前项目已有任务执行中，请等待完成",
+    "workspace_busy": "相同或相互包含的目录正在执行任务，请等待目录空闲",
     "already_claimed": "卡片已被其他执行器认领",
-    "busy": "已有任务正在执行",
     "not_running": "该任务当前没有在执行",
     "bad_length": "请求长度无效",
     "too_large": "请求过大或长度无效",
@@ -118,20 +119,15 @@ STOP_TIMEOUT = "执行超时"
 
 
 class ActiveRun:
-    """The single execution slot. Guards stop requests and the timeout watchdog."""
+    """One run owns its process, stop event and timeout; never shared across tasks."""
 
-    def __init__(self):
+    def __init__(self, card_id, run_id):
         self.guard = threading.Lock()
-        self.card_id = None
-        self.run_id = None
+        self.card_id = card_id
+        self.run_id = run_id
         self.process = None
         self.reason = ""
         self.stop = threading.Event()
-
-    def begin(self, card_id, run_id):
-        with self.guard:
-            self.card_id, self.run_id, self.process, self.reason = card_id, run_id, None, ""
-            self.stop = threading.Event()
 
     def attach(self, process):
         with self.guard:
@@ -152,22 +148,35 @@ class ActiveRun:
             kill_process(process)
         return True
 
-    def end(self):
-        with self.guard:
-            self.card_id = self.run_id = self.process = None
+
+def active_run(card_id):
+    with RUNS_GUARD:
+        return ACTIVE_RUNS.get(card_id)
 
 
-ACTIVE = ActiveRun()
+def has_active_runs():
+    with RUNS_GUARD:
+        return bool(ACTIVE_RUNS)
 
 
-def kill_process(process):
+def release_active(active):
+    # Identity check prevents a late cleanup from removing a newer run.
+    with RUNS_GUARD:
+        if ACTIVE_RUNS.get(active.card_id) is active:
+            del ACTIVE_RUNS[active.card_id]
+    AUTO_WAKE.set()
+
+
+def kill_process(process, force=False):
     """Terminate the Codex process group; escalate to SIGKILL after 5 seconds."""
     pid = getattr(process, "pid", None)
     if not pid:
         return
     try:
-        group = os.getpgid(pid)
-        os.killpg(group, signal.SIGTERM)
+        group = pid if force else os.getpgid(pid)
+        os.killpg(group, signal.SIGKILL if force else signal.SIGTERM)
+        if force:
+            return
     except (ProcessLookupError, PermissionError, OSError):
         return
 
@@ -181,9 +190,9 @@ def kill_process(process):
     threading.Thread(target=escalate, daemon=True).start()
 
 
-def pause(seconds):
+def pause(seconds, active):
     """Retry back-off that returns early when a stop is requested."""
-    ACTIVE.stop.wait(seconds)
+    active.stop.wait(seconds)
 
 
 def execution_catalog():
@@ -321,6 +330,7 @@ def init_db():
             con.execute("ALTER TABLE runs ADD COLUMN comment_through_id INTEGER")
         for field, definition in (("retry_count", "INTEGER NOT NULL DEFAULT 0"), ("retry_wait", "INTEGER NOT NULL DEFAULT 0"),
                                   ("activity", "TEXT NOT NULL DEFAULT ''"),
+                                  ("workspace_path", "TEXT NOT NULL DEFAULT ''"),
                                   # Which executor produced the run; thread_id is that executor's session id.
                                   ("executor", "TEXT NOT NULL DEFAULT 'codex'")):
             if field not in columns(con, "runs"):
@@ -418,8 +428,12 @@ def state():
     with db() as con:
         cards = rows(con, "SELECT *, printf('DEV-%012d',id) AS global_number FROM cards ORDER BY id")
         summarize_cards(con, cards, card_issue, run_summary)
+        projects = rows(con, "SELECT * FROM projects ORDER BY id")
+        running = running_workspaces(con)
+        for project in projects:
+            project["execution_wait"] = execution_conflict(project["id"], project["path"], running)
         snapshot = {
-            "projects": rows(con, "SELECT * FROM projects ORDER BY id"),
+            "projects": projects,
             "executionModels": execution_catalog(),
             "executionDefaults": dict(zip(("model", "thinking"), default_execution())),
             "codexAvailable": shutil.which("codex") is not None,
@@ -743,10 +757,10 @@ def event_error(event):
     return ""
 
 
-def run_attempt(card, prompt, run_id):
+def run_attempt(card, prompt, run_id, active):
     process = subprocess.Popen(execution_command(card), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, text=True, bufsize=1, start_new_session=True)
-    ACTIVE.attach(process)
+    active.attach(process)
     stderr_tail = collections.deque(maxlen=40)
     stderr = getattr(process, "stderr", None)
     reader = None
@@ -792,20 +806,59 @@ def run_attempt(card, prompt, run_id):
             failed = True
         errors = errors[-20:]
     code = process.wait()
+    if active.stop.is_set():
+        # The parent may exit before a child that ignored SIGTERM. Do not release
+        # the directory reservation while that process group can still write.
+        kill_process(process, force=True)
     if reader is not None:
         reader.join(timeout=2)
     needs_input = re.search(r"(?m)^TASKBOARD_NEEDS_INPUT:\s*(.+)", final_text)
-    success = code == 0 and not failed and bool(final_text.strip()) and not needs_input and not ACTIVE.stop.is_set()
+    success = code == 0 and not failed and bool(final_text.strip()) and not needs_input and not active.stop.is_set()
     if success:
         error = ""
-    elif ACTIVE.stop.is_set():
-        error = ACTIVE.reason or STOP_MANUAL
+    elif active.stop.is_set():
+        error = active.reason or STOP_MANUAL
     elif needs_input:
         error = needs_input.group(0)
     else:
         detail = "\n".join(errors) or "\n".join(stderr_tail)
         error = detail[-4000:] or "执行未返回有效结果；Codex 退出码 " + str(code)
     return success, thread_id, final_text, error, work_started
+
+
+def directories_overlap(left, right):
+    """Resolve symlinks; compare path components and filesystem identities (case aliases)."""
+    if not left or not right:
+        return True  # Unknown legacy reservation: wait rather than allow unsafe overlap.
+    try:
+        a, b = Path(left).resolve(), Path(right).resolve()
+        if a == b or a in b.parents or b in a.parents:
+            return True
+        # samefile also handles case-insensitive volumes and filesystem aliases.
+        for root, descendants in ((a, (b, *b.parents)), (b, (a, *a.parents))):
+            for descendant in descendants:
+                try:
+                    if root.samefile(descendant):
+                        return True
+                except (OSError, ValueError):
+                    pass
+        return False
+    except (OSError, RuntimeError, ValueError):
+        return True
+
+
+def running_workspaces(con):
+    return rows(con, """SELECT c.project_id, COALESCE(NULLIF(r.workspace_path,''),p.path) AS path
+                       FROM runs r JOIN cards c ON c.id=r.card_id JOIN projects p ON p.id=c.project_id
+                       WHERE r.status='running'""")
+
+
+def execution_conflict(project_id, path, running):
+    if any(run["project_id"] == project_id for run in running):
+        return "project_busy"
+    if any(directories_overlap(path, run["path"]) for run in running):
+        return "workspace_busy"
+    return ""
 
 
 def claim_card(card_id, automatic=False):
@@ -823,8 +876,9 @@ def claim_card(card_id, automatic=False):
             raise TaskBlocked("blocked_path")
         if not shutil.which("codex"):
             raise TaskBlocked("blocked_codex")
-        if con.execute("SELECT COUNT(*) FROM runs WHERE status='running'").fetchone()[0]:
-            raise BoardError("single_run")
+        conflict = execution_conflict(card["project_id"], card["path"], running_workspaces(con))
+        if conflict:
+            raise BoardError(conflict)
         try:
             validate_execution(card["model"], card["thinking"])
         except ValueError as exc:
@@ -833,42 +887,45 @@ def claim_card(card_id, automatic=False):
                               (now(), card_id)).rowcount
         if not changed:
             raise BoardError("already_claimed")
-        cur = con.execute("INSERT INTO runs(card_id,status,started_at,model,thinking) VALUES (?,?,?,?,?)",
-                          (card_id, "running", now(), card["model"], card["thinking"]))
-        return dict(card), cur.lastrowid
+        card = dict(card)
+        card["path"] = str(Path(card["path"]).resolve())
+        cur = con.execute("INSERT INTO runs(card_id,status,started_at,model,thinking,workspace_path) VALUES (?,?,?,?,?,?)",
+                          (card_id, "running", now(), card["model"], card["thinking"], card["path"]))
+        return card, cur.lastrowid
 
 
 def execute_card(card_id, automatic=False):
-    if not RUN_LOCK.acquire(blocking=False):
-        raise BoardError("busy")
+    # SQLite BEGIN IMMEDIATE in claim_card reserves project + directory atomically,
+    # including the gap before the worker thread starts. No global execution limit.
     try:
         card, run_id = claim_card(card_id, automatic=automatic)
     except TaskBlocked as exc:
-        try:
-            with db() as con:
-                changed = con.execute("UPDATE cards SET status='review',updated_at=? WHERE id=? AND status='todo'", (now(), card_id)).rowcount
-                if changed:
-                    con.execute("INSERT INTO runs(card_id,status,error,started_at,ended_at) VALUES (?,?,?,?,?)", (card_id, "failed", str(exc), now(), now()))
-        finally:
-            RUN_LOCK.release()
-            AUTO_WAKE.set()
+        with db() as con:
+            con.execute("BEGIN IMMEDIATE")
+            changed = con.execute("UPDATE cards SET status='review',updated_at=? WHERE id=? AND status='todo'", (now(), card_id)).rowcount
+            if changed:
+                con.execute("INSERT INTO runs(card_id,status,error,started_at,ended_at) VALUES (?,?,?,?,?)", (card_id, "failed", str(exc), now(), now()))
+        AUTO_WAKE.set()
         raise
-    except Exception:
-        RUN_LOCK.release()
-        raise
-    ACTIVE.begin(card_id, run_id)
+    active = ActiveRun(card_id, run_id)
+    with RUNS_GUARD:
+        ACTIVE_RUNS[card_id] = active
     try:
-        thread = threading.Thread(target=run_codex, args=(card, run_id), daemon=True)
+        thread = threading.Thread(target=run_codex, args=(card, run_id, active), daemon=True)
         thread.start()
     except Exception:
-        ACTIVE.end()
-        RUN_LOCK.release()
+        # A failed thread start must release the persisted reservation as well.
+        with db() as con:
+            con.execute("UPDATE runs SET status='failed',error='执行线程无法启动',ended_at=? WHERE id=?", (now(), run_id))
+            con.execute("UPDATE cards SET status='review',updated_at=? WHERE id=?", (now(), card_id))
+        release_active(active)
         raise
     return {"runId": run_id}
 
 
 def stop_card(card_id):
-    if not ACTIVE.request_stop(STOP_MANUAL, card_id):
+    active = active_run(card_id)
+    if active is None or not active.request_stop(STOP_MANUAL, card_id):
         raise BoardError("not_running")
     return {"ok": True}
 
@@ -922,12 +979,12 @@ def write_project_context(con, card, destination):
     ])
 
 
-def run_codex(card, run_id):
+def run_codex(card, run_id, active):
     context = None
     watchdog = None
     if RUN_TIMEOUT_SECONDS > 0:
         minutes = RUN_TIMEOUT_SECONDS // 60
-        watchdog = threading.Timer(RUN_TIMEOUT_SECONDS, ACTIVE.request_stop,
+        watchdog = threading.Timer(RUN_TIMEOUT_SECONDS, active.request_stop,
                                    args=("%s：超过 %s 分钟未完成" % (STOP_TIMEOUT, minutes),))
         watchdog.daemon = True
         watchdog.start()
@@ -955,20 +1012,20 @@ def run_codex(card, run_id):
         ])
         success, thread_id, final_text, error = False, "", "", ""
         for attempt in range(3):
-            if ACTIVE.stop.is_set():
-                error = ACTIVE.reason or STOP_MANUAL
+            if active.stop.is_set():
+                error = active.reason or STOP_MANUAL
                 break
             with db() as con:
                 con.execute("UPDATE runs SET retry_wait=0 WHERE id=?", (run_id,))
-            success, thread_id, final_text, error, work_started = run_attempt(card, prompt, run_id)
-            if success or work_started or ACTIVE.stop.is_set() or not failure_info(error)["retryable"] or attempt == 2:
+            success, thread_id, final_text, error, work_started = run_attempt(card, prompt, run_id, active)
+            if success or work_started or active.stop.is_set() or not failure_info(error)["retryable"] or attempt == 2:
                 break
             delay = (15, 45)[attempt]
             with db() as con:
                 con.execute("UPDATE runs SET retry_count=?,retry_wait=?,error=? WHERE id=?", (attempt + 1, delay, error, run_id))
-            pause(delay)
-        if not success and ACTIVE.stop.is_set():
-            error = ACTIVE.reason or STOP_MANUAL
+            pause(delay, active)
+        if not success and active.stop.is_set():
+            error = active.reason or STOP_MANUAL
         with db() as con:
             con.execute("""UPDATE runs SET status=?,thread_id=?,output=?,error=?,retry_wait=0,activity='',ended_at=? WHERE id=?""",
                         ("completed" if success else "failed", thread_id, final_text[:20000],
@@ -981,37 +1038,47 @@ def run_codex(card, run_id):
     finally:
         if watchdog is not None:
             watchdog.cancel()
-        ACTIVE.end()
         try:
             if context is not None:
                 context.cleanup()
         finally:
-            RUN_LOCK.release()
-            AUTO_WAKE.set()
+            release_active(active)
 
 
-def auto_candidate():
+def auto_candidate(excluded=()):
     with db() as con:
-        return con.execute("""SELECT c.id FROM cards c JOIN projects p ON p.id=c.project_id
-                              WHERE c.status='todo' AND p.workflow='development'
-                              AND p.auto_enabled=1
+        running = running_workspaces(con)
+        candidates = rows(con, """SELECT c.id,c.project_id,p.path FROM cards c JOIN projects p ON p.id=c.project_id
+                              WHERE c.status='todo' AND p.workflow='development' AND p.auto_enabled=1
                               ORDER BY CASE c.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1
-                              WHEN 'normal' THEN 2 ELSE 3 END, c.id LIMIT 1""").fetchone()
+                              WHEN 'normal' THEN 2 ELSE 3 END, c.id""")
+        for card in candidates:
+            if card["id"] not in excluded and not execution_conflict(card["project_id"], card["path"], running):
+                return card
+    return None
+
+
+def auto_dispatch():
+    """Fill all eligible project/directory slots; a blocked queue head cannot stall others."""
+    attempted = set()
+    while True:
+        candidate = auto_candidate(attempted)
+        if not candidate:
+            return
+        attempted.add(candidate["id"])
+        try:
+            execute_card(candidate["id"], automatic=True)
+        except ValueError:
+            pass  # Preflight failure/racing claim: keep scanning independent projects.
 
 
 def auto_worker():
     while True:
         AUTO_WAKE.wait(3)
         AUTO_WAKE.clear()
-        if RUN_LOCK.locked():
-            continue
         try:
-            candidate = auto_candidate()
-            if candidate:
-                execute_card(candidate["id"], automatic=True)
-        except ValueError:
-            pass
-        except Exception as exc:  # Keep the worker alive; one bad cycle must not stop auto claiming.
+            auto_dispatch()
+        except Exception as exc:
             print("auto_worker:", exc, flush=True)
 
 

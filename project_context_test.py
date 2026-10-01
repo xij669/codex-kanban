@@ -55,11 +55,10 @@ with tempfile.TemporaryDirectory() as root:
         stdout = iter([json.dumps({'type':'item.completed','item':{'type':'agent_message','text':'测试完成'}})])
         def wait(self): return 0
     with patch('server.subprocess.Popen', return_value=Process()) as popen:
-        server.RUN_LOCK.acquire()
-        server.run_codex(card, run_id)
+        server.run_codex(card, run_id, server.ActiveRun(card["id"], run_id))
         assert popen.call_args[0][0] == server.execution_command(card)
     assert not captured['path'].exists()
-    assert not server.RUN_LOCK.locked()
+    assert not server.has_active_runs()
     assert next(c for c in server.state()['cards'] if c['id']==current)['status'] == 'review'
     assert set(p.name for p in Path(root).iterdir()) == {'board.sqlite3','snapshot'}
 print('同项目索引、跨项目隔离、完整历史读取、执行注入和临时资料清理检查通过')

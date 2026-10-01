@@ -16,12 +16,12 @@ with tempfile.TemporaryDirectory() as folder:
         with patch('server.shutil.which',return_value='/test/codex'):
             card,rid=server.claim_card(cid)
         waits=[]
-        def wait(seconds):
+        def wait(seconds, active):
             run=next(r for r in server.card_detail(cid)['runs'] if r['id']==rid)
             assert run['status']=='running' and run['retry_wait']==seconds
             waits.append(seconds)
         with patch('server.run_attempt',side_effect=outcomes) as attempt,patch('server.pause',side_effect=wait):
-            server.RUN_LOCK.acquire();server.run_codex(card,rid)
+            server.run_codex(card,rid,server.ActiveRun(card["id"],rid))
         state=server.state()
         return next(c for c in state['cards'] if c['id']==cid),waits,attempt.call_count
     network=(False,'','','network connection reset',False)
@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory() as folder:
         server.execute_card(cid)
         raise AssertionError('失效目录必须返回审阅中并标记失败')
     except server.TaskBlocked:pass
-    assert not server.RUN_LOCK.locked()
+    assert not server.has_active_runs()
     c=next(c for c in server.state()['cards'] if c['id']==cid)
     assert c['status']=='review' and c['issue']['title']=='项目目录无法访问'
     # Even a zero exit code must not hide explicit failure or missing user information.
@@ -57,5 +57,5 @@ with tempfile.TemporaryDirectory() as folder:
         [{'type':'item.completed','item':{'type':'agent_message','text':'TASKBOARD_NEEDS_INPUT: 请补充信息'}}]
     ]:
         with patch('server.subprocess.Popen',return_value=Process(events)):
-            assert server.run_attempt(card,'测试',-1)[0] is False
+            assert server.run_attempt(card,'测试',-1,server.ActiveRun(-1,-1))[0] is False
 print('异常原因、需补充信息、有限重试、已操作后禁止重跑及预检失败检查通过')

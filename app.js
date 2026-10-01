@@ -186,7 +186,7 @@ for (const type of ["pointerleave", "focusout"]) {
   }, true);
 }
 
-function runningCard() { return S.cards.find(c => c.status === "progress"); }
+function runningCard(p) { return S.cards.find(c => c.status === "progress" && c.project_id === p.id); }
 
 function renderAgent(p) {
   const control = $("#agent-control");
@@ -196,10 +196,10 @@ function renderAgent(p) {
   const enabled = pendingAuto.has(p.id) ? pendingAuto.get(p.id) : !!p.auto_enabled;
   toggle.checked = enabled;
   toggle.disabled = pendingAuto.has(p.id);
-  const running = runningCard(), queued = countBy(p, "todo");
+  const running = runningCard(p), queued = countBy(p, "todo");
   let text, dot;
-  if (running && running.project_id === p.id) { text = t("auto.running", {task: cardName(running)}); dot = "running"; }
-  else if (running) { text = t("auto.runningElsewhere"); dot = enabled ? "on" : "off"; }
+  if (running) { text = t("auto.running", {task: cardName(running)}); dot = "running"; }
+  else if (enabled && queued && p.execution_wait === "workspace_busy") { text = t("auto.workspaceWaiting"); dot = "on"; }
   else if (enabled) { text = queued ? t("auto.queued", {n: queued}) : t("auto.idle"); dot = "on"; }
   else { text = queued ? t("auto.pausedQueued", {n: queued}) : t("auto.paused"); dot = "off"; }
   $("#agent-status").textContent = text;

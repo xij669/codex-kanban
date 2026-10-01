@@ -31,7 +31,7 @@ You can try the board without Codex. To run tasks, install and sign in to the [C
 | In review | You | **Approve**, or write a change request and **Submit changes** to send it back to To do. Failed, stopped and timed-out runs also land here with the reason. |
 | Done / Cancelled | — | Hidden by default. |
 
-One task runs at a time; urgent tasks do not interrupt a running one. A run stops after 60 minutes by default (`BOARD_RUN_TIMEOUT_MINUTES`, `0` for no limit). **Auto-run** is off by default and set per project.
+Different projects with independent folders can run concurrently, with no global concurrency cap. Tasks in the same project, or in identical or nested folders, run sequentially; symbolic links are resolved to actual folders. Urgent tasks retain their queue priority without interrupting active runs. Stop, timeout and retry controls apply to each task independently. Tasks waiting for a busy folder stay in To do; Auto-run skips them to start other eligible projects and checks again when the folder is released. A run stops after 60 minutes by default (`BOARD_RUN_TIMEOUT_MINUTES`, `0` for no limit). **Auto-run** is off by default and set per project.
 
 ### Your first run
 

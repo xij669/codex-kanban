@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Run independent folders in different projects concurrently, with no global concurrency cap or extra setting. Tasks in the same project and identical/nested folders remain sequential; symbolic links and filesystem aliases are checked.
+- Claim tasks and reserve their actual workspace atomically. A running task retains its original folder reservation if project settings change. Auto-run skips busy folders and fills other eligible projects; waiting tasks stay in To do.
+- Isolate stop, timeout, retry and process cleanup per task. Stopping one task does not stop other projects. Retry backoff keeps its workspace reservation.
+- Show the current project's running task or folder wait in the agent status, with Chinese, English and Japanese text. Urgent tasks remain prioritized without preemption.
+- Add an additive, repeatable `runs.workspace_path` migration; preserve projects, tasks, history, settings and browser preferences. Add concurrency and legacy migration tests; update all three READMEs and agent guidance.
+- Upgrade: finish or stop active tasks and stop the server first. Git installs: `git pull --ff-only`. ZIP installs: unpack into a different folder and run its `python3 -B update.py "/path/to/existing/install"`. Restart from the original folder on the same port.
+
 ## 0.2.3
 
 - Add **Duplicate task** to the existing task detail header on desktop and mobile, in all three interface languages. One click creates and opens a new task in the same project, with a fresh task number in Backlog.

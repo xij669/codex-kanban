@@ -71,12 +71,13 @@ Check `codex --version` and that `codex exec --help` lists `--json`, `--approve-
 - For ZIP upgrades, use `python3 -B update.py /path/to/existing/install` from the new release; never replace the old directory. Keep the browser origin/port unchanged for local language and selected-project preferences. Git upgrades use `git pull --ff-only`, never force-reset user data.
 - Tasks execute real commands. Never weaken sandboxing to solve an installation problem.
 - Backlog never runs automatically. Success/failure returns to review. Only user approval marks done. State `blocked` is legacy and must not be reintroduced.
-- Keep automatic claiming project-specific; one global executor slot; no preemption.
+- Keep automatic claiming project-specific; independent folders in different projects may run concurrently with no global cap. Serialize the same project and identical/nested folders; resolve symbolic links and filesystem aliases. Keep per-task stop/timeout/retry controls independent; no preemption.
 - `POST /api/cards/<global-id>/duplicate` creates a same-project Backlog task with a fresh ID/number and saved task inputs/configuration only. It never copies comments or execution history, or starts execution. Use the returned global `id`, not the displayed TASK number.
 
 ## Contributing
 
-- `server.py`: HTTP, SQLite migrations, executor. `board_state.py`: compact board queries. `codex_usage.py`: read-only quota RPC and cache (`GET /api/usage`); needs local Codex ChatGPT login, never starts a model turn. `app.js`, `i18n.js`, `style.css`, `index.html`: UI and localization. `*_test.py`: no real model calls.
+- `server.py`: HTTP, SQLite migrations, executor. `claim_card()` atomically reserves a project and canonical folder (`runs.workspace_path`); `ACTIVE_RUNS` holds one `ActiveRun` controller per task. `run_codex(card, run_id, active)` and `run_attempt(..., active)` must never use a shared cancellation flag. `auto_dispatch()` fills eligible projects, skipping occupied folders; backoff retains the reservation. `concurrency_test.py` verifies real fake-process overlap, directory conflicts and cancellation isolation. `projects.execution_wait` is derived in the state snapshot, not a saved setting.
+- Other modules: `board_state.py`: compact board queries. `codex_usage.py`: read-only quota RPC and cache (`GET /api/usage`); needs local Codex ChatGPT login, never starts a model turn. `app.js`, `i18n.js`, `style.css`, `index.html`: UI and localization. `*_test.py`: no real model calls.
 - Interface text lives in `i18n.js` (`t("key")`, keys with zh/en/ja). Server errors use codes (`BoardError`, `ERRORS`) and failure reasons use `issue.code`; the browser translates by code. Never put user content (task titles, comments, project names, tags, paths, run output) into translated text. `i18n_test.py` must pass.
 - SQLite migrations must be idempotent, additive and keep existing data (`compat_test.py`). Never rename the browser storage keys `codexKanbanLocale` / `boardProject`. Add focused tests for behavior changes.
 - Update `VERSION` and the changelog together for each visible release. The version is shown in the sidebar and Project settings.

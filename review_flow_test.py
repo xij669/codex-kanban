@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory() as folder:
             pass
     card = next(c for c in server.state()["cards"] if c["id"] == queued)
     assert card["status"] == "review" and card["issue"]["title"] == "缺少验收标准"
-    assert not server.RUN_LOCK.locked()
+    assert not server.has_active_runs()
 
     # Empty feedback requeues only when saved comments are still waiting for the agent.
     with server.db() as con:
@@ -112,7 +112,7 @@ with tempfile.TemporaryDirectory() as folder:
         expect_error(lambda: server.stop_card(legacy), "没有在执行")
         started = time.time()
         server.stop_card(queued)
-        while server.RUN_LOCK.locked() and time.time() - started < 10:
+        while server.has_active_runs() and time.time() - started < 10:
             time.sleep(0.1)
         assert time.time() - started < 8, "停止必须结束子进程"
     card = next(c for c in server.state()["cards"] if c["id"] == queued)
@@ -126,7 +126,7 @@ with tempfile.TemporaryDirectory() as folder:
             patch("server.RUN_TIMEOUT_SECONDS", 1):
         server.execute_card(queued)
         started = time.time()
-        while server.RUN_LOCK.locked() and time.time() - started < 10:
+        while server.has_active_runs() and time.time() - started < 10:
             time.sleep(0.1)
     card = next(c for c in server.state()["cards"] if c["id"] == queued)
     assert card["issue"]["title"] == "执行超时", card["issue"]

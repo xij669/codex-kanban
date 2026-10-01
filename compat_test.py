@@ -56,6 +56,7 @@ with tempfile.TemporaryDirectory() as folder:
         server.init_db()
     with sqlite3.connect(server.DB_PATH) as con:
         assert snapshot(con) == before, "user data changed during upgrade"
+        assert con.execute("SELECT workspace_path FROM runs WHERE id=41").fetchone()[0] == "", "legacy run history must remain unchanged"
         assert con.execute("SELECT status FROM cards WHERE id=21").fetchone()[0] == "review"
         assert con.execute("SELECT count(*) FROM projects").fetchone()[0] == 2, "demo data must not be added"
         assert con.execute("SELECT auto_enabled FROM projects WHERE id=7").fetchone()[0] == 1
