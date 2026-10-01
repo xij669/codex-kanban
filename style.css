@@ -408,3 +408,5 @@ body.no-project .m-top, body.no-project .m-tabs, body.no-project .m-hint, body.n
   .usage-window { flex: 1 1 140px; }
   .board { padding-bottom: 24px; }
 }
+
+.drawer-header-actions { display: flex; align-items: flex-start; flex: none; gap: 4px; }

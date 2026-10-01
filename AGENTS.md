@@ -72,6 +72,7 @@ Check `codex --version` and that `codex exec --help` lists `--json`, `--approve-
 - Tasks execute real commands. Never weaken sandboxing to solve an installation problem.
 - Backlog never runs automatically. Success/failure returns to review. Only user approval marks done. State `blocked` is legacy and must not be reintroduced.
 - Keep automatic claiming project-specific; one global executor slot; no preemption.
+- `POST /api/cards/<global-id>/duplicate` creates a same-project Backlog task with a fresh ID/number and saved task inputs/configuration only. It never copies comments or execution history, or starts execution. Use the returned global `id`, not the displayed TASK number.
 
 ## Contributing
 

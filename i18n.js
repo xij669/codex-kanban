@@ -15,6 +15,8 @@ const LOCALES = [
 ];
 
 const MESSAGES = {
+  "detail.duplicateTask": {zh: "复制任务", en: "Duplicate task", ja: "タスクを複製"},
+  "toast.taskDuplicated": {zh: "已复制到任务仓", en: "Duplicated to backlog", ja: "バックログに複製しました"},
   "usage.title": {zh: "Codex 额度", en: "Codex limits", ja: "Codex 利用枠"},
   "usage.shared": {zh: "账号共享", en: "Account-wide", ja: "アカウント共通"},
   "usage.loading": {zh: "读取中…", en: "Loading…", ja: "読み込み中…"},

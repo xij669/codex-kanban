@@ -543,21 +543,40 @@ def create_card(data):
             model, effort = default_execution()
             model, effort = str(data.get("model", model)), str(data.get("thinking", effort))
             validate_execution(model, effort)
-        stamp = now()
-        task_number = project["task_sequence"] + 1
-        card_id = int(con.execute("SELECT value FROM settings WHERE key='card_sequence'").fetchone()[0]) + 1
-        # JSON IDs must stay exact in JavaScript; reject instead of wrapping/rounding.
-        if max(task_number, card_id) > 9007199254740991:
-            raise BoardError("number_exhausted")
-        con.execute("UPDATE projects SET task_sequence=? WHERE id=?", (task_number, project_id))
-        con.execute("UPDATE settings SET value=? WHERE key='card_sequence'", (str(card_id),))
-        cur = con.execute("""INSERT INTO cards(id,task_number,project_id,title,description,acceptance,status,priority,tags,source,model,thinking,created_at,updated_at)
-                             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                          (card_id, task_number, project_id, title, str(data.get("description", "")).strip(),
-                           str(data.get("acceptance", "")).strip(), "backlog", priority,
-                           str(data.get("tags", "")).strip(), str(data.get("source", "")).strip(),
-                           model, effort, stamp, stamp))
-        return {"id": cur.lastrowid, "task_number": task_number}
+        fields = {key: str(data.get(key, "")).strip() for key in ("title", "description", "acceptance", "tags", "source")}
+        fields.update(priority=priority, model=model, thinking=effort)
+        return insert_card(con, project, fields)
+
+
+def insert_card(con, project, fields):
+    """Allocate both IDs in the caller's write transaction; always start in backlog."""
+    stamp = now()
+    task_number = project["task_sequence"] + 1
+    card_id = int(con.execute("SELECT value FROM settings WHERE key='card_sequence'").fetchone()[0]) + 1
+    if max(task_number, card_id) > 9007199254740991:
+        raise BoardError("number_exhausted")
+    con.execute("UPDATE projects SET task_sequence=? WHERE id=?", (task_number, project["id"]))
+    con.execute("UPDATE settings SET value=? WHERE key='card_sequence'", (str(card_id),))
+    con.execute("""INSERT INTO cards(id,task_number,project_id,title,description,acceptance,status,priority,tags,source,model,thinking,created_at,updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (card_id, task_number, project["id"], fields["title"], fields["description"], fields["acceptance"],
+                 "backlog", fields["priority"], fields["tags"], fields["source"], fields["model"], fields["thinking"], stamp, stamp))
+    return {"id": card_id, "task_number": task_number, "project_id": project["id"]}
+
+
+def duplicate_card(card_id):
+    """Copy saved task inputs only, atomically. No history, status or runtime metadata."""
+    with db() as con:
+        con.execute("BEGIN IMMEDIATE")
+        source = con.execute("SELECT * FROM cards WHERE id=?", (card_id,)).fetchone()
+        if not source:
+            raise BoardError("task_not_found")
+        project = con.execute("SELECT id,task_sequence FROM projects WHERE id=?", (source["project_id"],)).fetchone()
+        if not project:
+            raise BoardError("project_not_found")
+        fields = {key: source[key] for key in ("title", "description", "acceptance", "priority", "tags", "source", "model", "thinking")}
+        # Retain historical configuration verbatim; claim_card validates it before execution.
+        return insert_card(con, project, fields)
 
 
 def update_card(card_id, data):
@@ -1117,6 +1136,7 @@ class Handler(BaseHTTPRequestHandler):
             elif len(parts) == 4 and parts[:2] == ["api", "cards"]:
                 card_id, action = int(parts[2]), parts[3]
                 handlers = {
+                    "duplicate": lambda: duplicate_card(card_id),
                     "execution": lambda: set_execution(card_id, data),
                     "approve": lambda: approve_card(card_id),
                     "edit": lambda: update_card(card_id, data),

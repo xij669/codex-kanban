@@ -40,6 +40,10 @@ One task runs at a time; urgent tasks do not interrupt a running one. A run stop
 3. Move it to To do and click **Run now**. Turn on Auto-run only after you trust the flow.
 4. When it reaches In review, check the real files, then Approve or submit a change request.
 
+### Duplicate a task
+
+Open an existing task and click the copy icon in the top-right corner (**Duplicate task**). One click creates and opens a new task in the same project, with a fresh task number in Backlog. It keeps the saved title, description, acceptance criteria, priority, tags, source link, model and thinking setting. Comments, replies, run history, rounds, failures and the original status are not copied. Save any unsaved edits or comments first. The copy will not run until you move it to To do.
+
 ## Updating without losing your data
 
 Your projects, tasks, comments, run history and per-project settings live in `board.sqlite3` inside the folder you run the board from. Your language and selected project live in the browser. **Updates never replace any of these.**
@@ -53,7 +57,7 @@ Before updating: let running tasks finish (or stop them), then stop the board se
   python3 -B update.py "/full/path/to/your/existing/codex-kanban"
   ```
 
-  It replaces only `VERSION` and the six program files, makes a private SQLite backup in `backups/` of the existing folder first, and refuses to run while a task is still running. Your database, projects, `.remote/` and other files are not touched. Start the board again **from the existing folder**. Never copy a new ZIP over the old folder.
+  It replaces only `VERSION` and the seven program files, makes a private SQLite backup in `backups/` of the existing folder first, and refuses to run while a task is still running. Your database, projects, `.remote/` and other files are not touched. Start the board again **from the existing folder**. Never copy a new ZIP over the old folder.
 
 Database migrations run automatically on start, only add structure, and are tested against databases from the first preview (`compat_test.py`). To roll back, stop the server and restore a copy from `backups/`; changes made after that backup are lost.
 

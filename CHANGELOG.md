@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3
+
+- Add **Duplicate task** to the existing task detail header on desktop and mobile, in all three interface languages. One click creates and opens a new task in the same project, with a fresh task number in Backlog.
+- Copy saved title, description, acceptance criteria, priority, tags, source link, model and thinking settings. Do not copy comments, replies, run records, rounds, thread IDs, failures, timestamps or the original status. The original task and project files are unchanged.
+- Preserve saved historical model settings instead of silently substituting the current defaults; validate availability before execution. Unsaved edits/comments must be saved first, and the copy control is disabled while the request is pending.
+- Share transactional ID allocation with normal task creation; cover concurrent copies and numbering limits with a new no-model test. No schema or browser preference key changes; existing user data is preserved.
+
 ## 0.2.2
 
 - Add an account-wide Codex usage footer on desktop and mobile: remaining percentages for the available five-hour and weekly windows, with reset times in the viewer's local time zone. Low remaining quota (10% or less) uses a subtle amber label.

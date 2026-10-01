@@ -342,16 +342,17 @@ function closeModal(force = false) {
   return true;
 }
 
+const pendingCopies = new Set();
 const closeButton = () => `<button class="icon-button" data-action="close" aria-label="${h(t("app.close"))}">${icon("close")}</button>`;
 
 function modelControls(card, disabled) {
   const models = S.executionModels;
-  if (!models.length) return `<select class="mini-select" disabled title="${h(t("detail.noModels"))}"><option>${t("detail.codexDefault")}</option></select>`;
+  if (!models.length) return `<select class="mini-select" disabled title="${h(t("detail.noModels"))}"><option>${h(card.model || t("detail.codexDefault"))}</option></select>${card.thinking ? `<select class="mini-select" disabled aria-label="${h(t("detail.thinking"))}"><option>${h(card.thinking)}</option></select>` : ""}`;
   const chosen = card.model || S.executionDefaults.model;
   const model = models.find(m => m.id === chosen);
   const effort = card.thinking || model?.defaultEffort || "";
-  return `<select class="mini-select" data-setting="model" aria-label="${h(t("detail.model"))}" ${disabled ? "disabled" : ""}>${!model ? `<option value="">${t("detail.codexDefault")}</option>` : ""}${models.map(m => `<option value="${h(m.id)}" ${m.id === chosen ? "selected" : ""}>${h(m.name)}</option>`).join("")}</select>`
-    + `<select class="mini-select" data-setting="thinking" aria-label="${h(t("detail.thinking"))}" ${disabled || !model ? "disabled" : ""}>${(model?.efforts || []).map(e => `<option ${e === effort ? "selected" : ""}>${h(e)}</option>`).join("")}</select>`;
+  return `<select class="mini-select" data-setting="model" aria-label="${h(t("detail.model"))}" ${disabled ? "disabled" : ""}>${!model ? `<option value="${h(chosen)}" selected>${h(chosen || t("detail.codexDefault"))}</option>` : ""}${models.map(m => `<option value="${h(m.id)}" ${m.id === chosen ? "selected" : ""}>${h(m.name)}</option>`).join("")}</select>`
+    + `<select class="mini-select" data-setting="thinking" aria-label="${h(t("detail.thinking"))}" ${disabled || !model ? "disabled" : ""}>${(!model && effort ? [effort] : model?.efforts || []).map(e => `<option ${e === effort ? "selected" : ""}>${h(e)}</option>`).join("")}</select>`;
 }
 function priorityControl(card) {
   // The flag icon names the control; options stay one short word so the row never wraps.
@@ -501,7 +502,7 @@ function renderDetail() {
   const p = projectOf(full) || project();
   const {comments, runs} = detailData;
   const rounds = runs.length ? ` · ${t("detail.round", {n: runs.length})}` : "";
-  modal("detail", `<div class="drawer-header"><div class="drawer-heading"><div class="eyebrow">${cardName(full)}<span class="pill pill-${full.status}">${statusDot(full.status)}${label(full.status)}</span>${rounds}</div><h2>${h(full.title)}</h2></div>${closeButton()}</div>`
+  modal("detail", `<div class="drawer-header"><div class="drawer-heading"><div class="eyebrow">${cardName(full)}<span class="pill pill-${full.status}">${statusDot(full.status)}${label(full.status)}</span>${rounds}</div><h2>${h(full.title)}</h2></div><div class="drawer-header-actions"><button class="icon-button" data-action="duplicate-card" data-id="${full.id}" title="${h(t("detail.duplicateTask"))}" aria-label="${h(t("detail.duplicateTask"))}" ${pendingCopies.has(full.id) ? "disabled" : ""}>${icon("copy")}</button>${closeButton()}</div></div>`
     + `${decisionBar(full, p, runs)}<div class="drawer-body">${resultSection(full, runs)}${acceptanceSection(full, runs)}${composer(full, p)}`
     + `<div class="folds">${historySection(full, comments, runs)}${detailsSection(full)}${manageSection(full, p)}</div></div>`);
   const header = $("#modal-root .drawer-header");
@@ -564,6 +565,23 @@ async function act(action, el) {
     case "close": return closeModal();
     case "backdrop": if (el.classList.contains("modal-backdrop")) closeModal(); return;
     case "new-card": if (p && closeModal()) newCardForm(); return;
+    case "duplicate-card": {
+      const id = Number(el.dataset.id);
+      if (pendingCopies.has(id)) return;
+      if (hasDrafts()) { toast(t("toast.saveEdits")); return; }
+      pendingCopies.add(id); el.disabled = true;
+      try {
+        const copy = await api(`/api/cards/${id}/duplicate`, {});
+        closeModal(true);
+        projectId = copy.project_id; storage("set", "boardProject", projectId);
+        currentView = "board"; mobileStatus = "backlog";
+        searchText = ""; $("#search").value = "";
+        await refresh(true);
+        openDetail(copy.id);
+        toast(t("toast.taskDuplicated"));
+      } finally { pendingCopies.delete(id); el.disabled = false; }
+      return;
+    }
     case "new-project": if (closeModal()) newProjectForm(); return;
     case "project-settings": if (closeModal()) projectSettingsForm(); return;
     case "select-project": return switchProject(Number(el.dataset.id));
